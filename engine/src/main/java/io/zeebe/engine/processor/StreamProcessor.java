@@ -52,12 +52,13 @@ public class StreamProcessor extends Actor implements HealthMonitorable {
   private long snapshotPosition = -1L;
   private ProcessingStateMachine processingStateMachine;
 
-  private Phase phase = Phase.REPROCESSING;
+  private volatile Phase phase = Phase.REPROCESSING;
   private CompletableActorFuture<Void> openFuture;
   private CompletableActorFuture<Void> closeFuture = CompletableActorFuture.completed(null);
   private final String actorName;
   private FailureListener failureListener;
   private volatile long lastTickTime;
+  private boolean shouldProcess = true;
 
   protected StreamProcessor(final StreamProcessorBuilder processorBuilder) {
     this.actorScheduler = processorBuilder.getActorScheduler();
@@ -105,7 +106,8 @@ public class StreamProcessor extends Actor implements HealthMonitorable {
     }
 
     try {
-      processingStateMachine = new ProcessingStateMachine(processingContext, this::isOpened);
+      processingStateMachine =
+          new ProcessingStateMachine(processingContext, this::shouldProcessNext);
       openFuture.complete(null);
 
       final ReProcessingStateMachine reProcessingStateMachine =
@@ -174,6 +176,10 @@ public class StreamProcessor extends Actor implements HealthMonitorable {
     isOpened.set(false);
     lifecycleAwareListeners.forEach(StreamProcessorLifecycleAware::onFailed);
     tearDown();
+  }
+
+  private boolean shouldProcessNext() {
+    return isOpened() && shouldProcess;
   }
 
   private void tearDown() {
@@ -319,6 +325,8 @@ public class StreamProcessor extends Actor implements HealthMonitorable {
     // If healthCheckTick was not invoked it indicates the actor is blocked in a runUntilDone loop.
     if (ActorClock.currentTimeMillis() - lastTickTime > HEALTH_CHECK_TICK_DURATION.toMillis() * 2) {
       return HealthStatus.UNHEALTHY;
+    } else if (phase == Phase.PAUSED || phase == Phase.FAILED) {
+      return HealthStatus.UNHEALTHY;
     } else {
       return HealthStatus.HEALTHY;
     }
@@ -329,9 +337,33 @@ public class StreamProcessor extends Actor implements HealthMonitorable {
     actor.run(() -> this.failureListener = failureListener);
   }
 
+  public void pauseProcessing() {
+    actor.call(
+        () -> {
+          if (this.shouldProcess) {
+            lifecycleAwareListeners.forEach(StreamProcessorLifecycleAware::onPaused);
+            this.shouldProcess = false;
+            phase = Phase.PAUSED;
+          }
+        });
+  }
+
+  public void resumeProcessing() {
+    actor.call(
+        () -> {
+          if (!this.shouldProcess) {
+            lifecycleAwareListeners.forEach(StreamProcessorLifecycleAware::onResumed);
+            this.shouldProcess = true;
+            phase = Phase.PROCESSING;
+            actor.submit(processingStateMachine::readNextEvent);
+          }
+        });
+  }
+
   private enum Phase {
     REPROCESSING,
     PROCESSING,
-    FAILED
+    FAILED,
+    PAUSED,
   }
 }

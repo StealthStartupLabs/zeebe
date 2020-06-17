@@ -94,7 +94,8 @@ public final class AtomixFactory {
             .withDataDirectory(raftDirectory)
             .withSnapshotStoreFactory(new FileBasedSnapshotStoreFactory())
             .withStorageLevel(dataCfg.getAtomixStorageLevel())
-            .withFlushOnCommit();
+            .withFlushOnCommit()
+            .withFreeDiskBuffer(dataCfg.getLowFreeDiskSpaceWatermarkInBytes());
 
     // by default, the Atomix max entry size is 1 MB
     final int maxMessageSize = (int) networkCfg.getMaxMessageSizeInBytes();
