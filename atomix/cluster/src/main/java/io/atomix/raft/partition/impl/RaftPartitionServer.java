@@ -301,7 +301,7 @@ public class RaftPartitionServer implements Managed<RaftPartitionServer> {
         .withMaxEntrySize((int) storageConfig.getMaxEntrySize().bytes())
         .withFlushOnCommit(storageConfig.isFlushOnCommit())
         .withDynamicCompaction(compactionConfig.isDynamic())
-        .withFreeDiskBuffer(storageConfig.getFreeDiskBuffer())
+        .withFreeDiskSpace(storageConfig.getFreeDiskSpace())
         .withFreeMemoryBuffer(compactionConfig.getFreeMemoryBuffer())
         .withNamespace(RaftNamespaces.RAFT_STORAGE)
         .withSnapshotStore(persistedSnapshotStore)

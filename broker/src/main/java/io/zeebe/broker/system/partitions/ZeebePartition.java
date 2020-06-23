@@ -786,7 +786,7 @@ public final class ZeebePartition extends Actor
   }
 
   @Override
-  public void onDiskSpaceUsageIncreasedAboveThreshold() {
+  public void onDiskSpaceNotAvailable() {
     actor.call(
         () -> {
           if (streamProcessor != null) {
@@ -797,7 +797,7 @@ public final class ZeebePartition extends Actor
   }
 
   @Override
-  public void onDiskSpaceUsageReducedBelowThreshold() {
+  public void onDiskSpaceAvailable() {
     actor.call(
         () -> {
           if (streamProcessor != null) {
