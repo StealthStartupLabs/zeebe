@@ -223,7 +223,7 @@ public class SwimMembershipProtocol
    */
   private boolean updateState(final ImmutableMember member) {
     // If the member matches the local member, ignore the update.
-    if (member.id().equals(localMember.id()) || member.address().equals(localMember.address())) {
+    if (member.id().equals(localMember.id())) {
       return false;
     }
 
