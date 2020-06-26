@@ -170,17 +170,11 @@ public class SwimMembershipProtocol
       LOGGER.debug("Nodes from discovery service {}", discoveryService.getNodes());
 
       registerHandlers();
-      gossipFuture =
-          swimScheduler.schedule(
-              (Runnable) this::gossip,
-              config.getGossipInterval().toMillis(),
-              TimeUnit.MILLISECONDS);
-      probeFuture =
-          swimScheduler.schedule(
-              (Runnable) this::probe, config.getProbeInterval().toMillis(), TimeUnit.MILLISECONDS);
-      syncFuture =
-          swimScheduler.schedule(
-              (Runnable) this::sync, config.getSyncInterval().toMillis(), TimeUnit.MILLISECONDS);
+
+      scheduleGossip();
+      scheduleProbe();
+      scheduleSync();
+
       LOGGER.info("Started");
     }
     return CompletableFuture.completedFuture(null);
@@ -434,10 +428,8 @@ public class SwimMembershipProtocol
                     member,
                     error);
               }
-              swimScheduler.schedule(
-                  (Runnable) this::sync,
-                  config.getSyncInterval().toMillis(),
-                  TimeUnit.MILLISECONDS);
+
+              scheduleSync();
             },
             swimScheduler);
   }
@@ -455,8 +447,7 @@ public class SwimMembershipProtocol
         sync(member.copy());
       }
     } else {
-      swimScheduler.schedule(
-          (Runnable) this::sync, config.getSyncInterval().toMillis(), TimeUnit.MILLISECONDS);
+      scheduleSync();
     }
   }
 
@@ -494,6 +485,8 @@ public class SwimMembershipProtocol
       final SwimMember probeMember =
           probeMembers.get(Math.abs(probeCounter.incrementAndGet() % probeMembers.size()));
       probe(probeMember.copy());
+    } else {
+      scheduleProbe();
     }
   }
 
@@ -525,10 +518,8 @@ public class SwimMembershipProtocol
                   requestProbes(swimMember.copy());
                 }
               }
-              swimScheduler.schedule(
-                  (Runnable) this::probe,
-                  config.getProbeInterval().toMillis(),
-                  TimeUnit.MILLISECONDS);
+
+              scheduleProbe();
             },
             swimScheduler);
   }
@@ -730,8 +721,7 @@ public class SwimMembershipProtocol
       gossip(updates);
     }
 
-    swimScheduler.schedule(
-        (Runnable) this::gossip, config.getGossipInterval().toMillis(), TimeUnit.MILLISECONDS);
+    scheduleGossip();
   }
 
   /**
@@ -834,6 +824,24 @@ public class SwimMembershipProtocol
 
     // Unregister UDP message listeners.
     bootstrapService.getUnicastService().removeListener(MEMBERSHIP_GOSSIP, gossipListener);
+  }
+
+  private void scheduleGossip() {
+    gossipFuture =
+        swimScheduler.schedule(
+            (Runnable) this::gossip, config.getGossipInterval().toMillis(), TimeUnit.MILLISECONDS);
+  }
+
+  private void scheduleSync() {
+    syncFuture =
+        swimScheduler.schedule(
+            (Runnable) this::sync, config.getSyncInterval().toMillis(), TimeUnit.MILLISECONDS);
+  }
+
+  private void scheduleProbe() {
+    probeFuture =
+        swimScheduler.schedule(
+            (Runnable) this::probe, config.getProbeInterval().toMillis(), TimeUnit.MILLISECONDS);
   }
 
   /** Bootstrap member location provider type. */
