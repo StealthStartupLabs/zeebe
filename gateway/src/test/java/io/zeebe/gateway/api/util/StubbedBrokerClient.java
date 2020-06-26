@@ -18,6 +18,7 @@ import io.zeebe.gateway.impl.broker.BrokerResponseConsumer;
 import io.zeebe.gateway.impl.broker.cluster.BrokerTopologyManager;
 import io.zeebe.gateway.impl.broker.request.BrokerRequest;
 import io.zeebe.gateway.impl.broker.response.BrokerResponse;
+import io.zeebe.protocol.Protocol;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -51,17 +52,17 @@ public final class StubbedBrokerClient implements BrokerClient {
     return sendRequestWithRetry(request);
   }
 
+  // todo: consider removing this method (since its only used in testing)
   @Override
   public <T> CompletableFuture<BrokerResponse<T>> sendRequestWithRetry(
       final BrokerRequest<T> request) {
-    brokerRequests.add(request);
-    try {
-      final RequestHandler requestHandler = requestHandlers.get(request.getClass());
-      final BrokerResponse<T> response = requestHandler.handle(request);
-      return CompletableFuture.completedFuture(response);
-    } catch (final Exception e) {
-      return CompletableFuture.failedFuture(e);
-    }
+    final CompletableFuture<BrokerResponse<T>> future = new CompletableFuture<>();
+    sendRequestWithRetry(
+        request,
+        (key, response) ->
+            future.complete(new BrokerResponse<>(response, Protocol.decodePartitionId(key), key)),
+        future::completeExceptionally);
+    return future;
   }
 
   @Override
