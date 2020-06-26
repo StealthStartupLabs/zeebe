@@ -46,6 +46,7 @@ import io.zeebe.client.impl.oauth.OAuthCredentialsProviderBuilder;
 import io.zeebe.client.util.Environment;
 import io.zeebe.client.util.EnvironmentRule;
 import io.zeebe.client.util.RecordingGatewayService;
+import io.zeebe.client.util.VersionUtil;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -317,13 +318,10 @@ public final class OAuthCredentialsProviderTest {
     // given
     mockCredentials(ACCESS_TOKEN);
     recordingInterceptor.setInterceptAction(
-        new BiConsumer<ServerCall, Metadata>() {
-          @Override
-          public void accept(final ServerCall call, final Metadata metadata) {
-            final String authHeader = metadata.get(AUTH_KEY);
-            if (authHeader != null && authHeader.endsWith("staleToken")) {
-              call.close(Status.UNAUTHENTICATED, metadata);
-            }
+        (call, metadata) -> {
+          final String authHeader = metadata.get(AUTH_KEY);
+          if (authHeader != null && authHeader.endsWith("staleToken")) {
+            call.close(Status.UNAUTHENTICATED, metadata);
           }
         });
     final String cachePath = tempFolder.getRoot().getPath() + File.separator + ".credsCache";
@@ -460,6 +458,7 @@ public final class OAuthCredentialsProviderTest {
         WireMock.post(WireMock.urlPathEqualTo("/oauth/token"))
             .withHeader("Content-Type", equalTo("application/x-www-form-urlencoded"))
             .withHeader("Accept", equalTo("application/json"))
+            .withHeader("User-Agent", equalTo("client: java, version: " + VersionUtil.getVersion()))
             .withRequestBody(equalTo(encodedBody))
             .willReturn(
                 WireMock.okJson(
